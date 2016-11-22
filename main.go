@@ -64,10 +64,10 @@ func mainWithErr() error {
 	done := make(chan struct{})
 	results := make(chan bool, 2*nGoRoutines)
 
-	// in the background, we will spin up go routines, on demand
-	// the call stack that spawned them never changed namespaces
-	// so we would hope that the code inside the goroutine
-	// would only ever run on the host namespace
+	// In the background, we will mimic a "server" that spins up goroutines on
+	// demand.  The call stack that spawned these goroutines has never changed
+	// namespaces, so we would expect that each goroutine would start on the
+	// host namespace, and stay there.
 	go func() {
 		for item := range workQueue {
 			myName := item
@@ -75,6 +75,7 @@ func mainWithErr() error {
 				originalNS := SnapshotNS()
 				results <- checkUnexpectedNS(myName+" start", hostNS, originalNS)
 
+				// a real program would do some work here (maybe use the network?)
 				<-done
 
 				finalNS := SnapshotNS()
@@ -83,18 +84,19 @@ func mainWithErr() error {
 		}
 	}()
 
-	// separately, we create a new namespace
+	// with that "server" running in the background, we now do some other thing
+	// that requires us to change namespaces.  We're trying to be careful, so
+	// we use the ns package from CNI.
 	newNS, err := ns.NewNS()
 	if err != nil {
 		return err
 	}
 
-	// and do some work inside this new namespace
 	err = newNS.Do(func(prevNS ns.NetNS) error {
 		newNS := SnapshotNS()
 		reportNamespace("newns", "start", newNS)
 
-		// queue up some work
+		// something in this namespace produces work for our server
 		for i := 0; i < nGoRoutines; i++ {
 			workQueue <- fmt.Sprintf("goroutine %2d", i)
 		}
@@ -109,6 +111,7 @@ func mainWithErr() error {
 
 	reportNamespace("main", "waiting", SnapshotNS())
 
+	// accumulate results: did any of the goroutines see the wrong namespace?
 	allGood := true
 	for i := 0; i < nGoRoutines; i++ {
 		allGood = allGood && <-results
