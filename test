@@ -5,7 +5,8 @@ set -o pipefail
 
 cd $(dirname "$0")
 
+export PATH=$PATH:$GOPATH/bin
+
 go install .
 
-# export GODEBUG=schedtrace=5,scheddetail=1
 nsmess "$@"
