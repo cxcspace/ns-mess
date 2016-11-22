@@ -10,78 +10,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func mainWithErr() error {
-	originalMain := Snap("main start")
-	log.Println(originalMain)
+// Snapshot is a string representation of the namespace inode
+type Snapshot string
 
-	newNS, err := ns.NewNS()
-	if err != nil {
-		return err
-	}
-
-	makeMeSomeGoRoutines := make(chan string)
-	stopTheGoRoutines := make(chan struct{})
-	wg := sync.WaitGroup{}
-
-	// in the background, we spin up some goroutines
-	go func() {
-		for name := range makeMeSomeGoRoutines {
-			wg.Add(1)
-			myName := name
-			go func() {
-				originalGoRoutine := Snap(myName)
-				reportIfNamespaceSwitch(myName, "start", originalMain, originalGoRoutine)
-				<-stopTheGoRoutines
-				finalGoRoutine := Snap(myName)
-				reportIfNamespaceSwitch(myName, "end", originalGoRoutine, finalGoRoutine)
-				wg.Done()
-			}()
-		}
-	}()
-
-	// spawn a goroutine that sits in that namespace
-	err = newNS.Do(func(prevNS ns.NetNS) error {
-		originalNewNS := Snap("newns start")
-		log.Println(originalNewNS)
-		for i := 0; i < 50; i++ {
-			makeMeSomeGoRoutines <- fmt.Sprintf("goroutine %2d", i)
-		}
-		close(stopTheGoRoutines)
-		finalNewNS := Snap("newns stop")
-		reportIfNamespaceSwitch("newns", "end", originalNewNS, finalNewNS)
-		return nil
-	})
-
-	log.Println(Snap("main waiting"))
-	wg.Wait()
-	log.Println(Snap("main stop "))
-	return err
-}
-
-func Snap(name string) Snapshot {
+func SnapshotNS() Snapshot {
 	inode, err := getInode(getCurrentThreadNetNSPath())
 	if err != nil {
 		panic(err)
 	}
-	return Snapshot{
-		Name: name,
-		NS:   fmt.Sprintf("%x", inode),
-	}
-}
-
-func reportIfNamespaceSwitch(name, state string, original, final Snapshot) {
-	if final.NS != original.NS {
-		log.Printf("MESSY %s %s: expected to be in NS %s but am instead in NS %s", name, state, original.NS, final.NS)
-	}
-}
-
-func (s Snapshot) String() string {
-	return fmt.Sprintf("%25s in namespace %10s", s.Name, s.NS)
-}
-
-type Snapshot struct {
-	Name string
-	NS   string
+	return Snapshot(fmt.Sprintf("%x", inode))
 }
 
 func getCurrentThreadNetNSPath() string {
@@ -104,6 +41,71 @@ func getInodeFd(fd int) (uint64, error) {
 	stat := &unix.Stat_t{}
 	err := unix.Fstat(fd, stat)
 	return stat.Ino, err
+}
+
+func reportIfUnexpectedNS(msg string, original, final Snapshot) {
+	if final != original {
+		log.Printf("MESSY %15s: expected %s, actual %s", msg, original, final)
+	}
+}
+
+func reportNamespace(routine, state string, snapshot Snapshot) {
+	log.Printf("%10s %7s in namespace %s", routine, state, snapshot)
+}
+
+func mainWithErr() error {
+	hostNS := SnapshotNS()
+	reportNamespace("main", "start", hostNS)
+
+	workQueue := make(chan string)
+	done := make(chan struct{})
+	wg := sync.WaitGroup{}
+
+	// in the background, we will spin up go routines, on demand
+	// the call stack that spawned them never changed namespaces
+	// so we would hope that the code inside the goroutine
+	// would only ever run on the host namespace
+	go func() {
+		for item := range workQueue {
+			wg.Add(1)
+			myName := item
+			go func() {
+				originalNS := SnapshotNS()
+				reportIfUnexpectedNS(myName+" start", hostNS, originalNS)
+
+				<-done
+				finalNS := SnapshotNS()
+				reportIfUnexpectedNS(myName+"   end", originalNS, finalNS)
+				wg.Done()
+			}()
+		}
+	}()
+
+	// separately, we create a new namespace
+	newNS, err := ns.NewNS()
+	if err != nil {
+		return err
+	}
+
+	// and do some work inside this new namespace
+	err = newNS.Do(func(prevNS ns.NetNS) error {
+		originalNewNS := SnapshotNS()
+		reportNamespace("newns", "start", originalNewNS)
+
+		// queue up some work
+		for i := 0; i < 50; i++ {
+			workQueue <- fmt.Sprintf("goroutine %2d", i)
+		}
+		close(done)
+
+		reportNamespace("newns", "end", SnapshotNS())
+		return nil
+	})
+
+	reportNamespace("main", "waiting", SnapshotNS())
+	wg.Wait()
+	reportNamespace("main", "end", SnapshotNS())
+	return err
 }
 
 func main() {
