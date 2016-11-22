@@ -89,8 +89,8 @@ func mainWithErr() error {
 
 	// and do some work inside this new namespace
 	err = newNS.Do(func(prevNS ns.NetNS) error {
-		originalNewNS := SnapshotNS()
-		reportNamespace("newns", "start", originalNewNS)
+		newNS := SnapshotNS()
+		reportNamespace("newns", "start", newNS)
 
 		// queue up some work
 		for i := 0; i < 50; i++ {
