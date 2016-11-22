@@ -44,9 +44,9 @@ func getInodeFd(fd int) (uint64, error) {
 	return stat.Ino, err
 }
 
-func checkUnexpectedNS(msg string, original, final Snapshot) bool {
-	if final != original {
-		log.Printf("MESSY %15s: expected %s, actual %s", msg, original, final)
+func checkUnexpectedNS(msg string, expected, actual Snapshot) bool {
+	if actual != expected {
+		log.Printf("MESSY %15s: expected %s, actual %s", msg, expected, actual)
 		return false
 	}
 	return true

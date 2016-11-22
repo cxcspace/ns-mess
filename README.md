@@ -21,6 +21,7 @@ root@ubuntu-xenial:/# ns-mess
 
 failure looks like
 ```
+root@ubuntu-xenial:/# ns-mess
       main   start in namespace f0000075
      newns   start in namespace f000187d
 MESSY goroutine  1 start: expected f0000075, actual f000187d
