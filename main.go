@@ -31,7 +31,6 @@ func mainWithErr() error {
 			go func() {
 				originalGoRoutine := Snap(myName)
 				reportIfNamespaceSwitch(myName, "start", originalMain, originalGoRoutine)
-				log.Println(originalGoRoutine)
 				<-stopTheGoRoutines
 				finalGoRoutine := Snap(myName)
 				reportIfNamespaceSwitch(myName, "end", originalGoRoutine, finalGoRoutine)
@@ -60,52 +59,36 @@ func mainWithErr() error {
 }
 
 func Snap(name string) Snapshot {
+	inode, err := getInode(getCurrentThreadNetNSPath())
+	if err != nil {
+		panic(err)
+	}
 	return Snapshot{
-		Name:   name,
-		Thread: WhatThread(),
-		NS:     WhatNS(),
+		Name: name,
+		NS:   fmt.Sprintf("%x", inode),
 	}
 }
 
 func reportIfNamespaceSwitch(name, state string, original, final Snapshot) {
 	if final.NS != original.NS {
-		log.Printf("MESSY %s: %5s: expected to be in NS %s but am instead in NS %s", name, state, original.NS, final.NS)
+		log.Printf("MESSY %s %s: expected to be in NS %s but am instead in NS %s", name, state, original.NS, final.NS)
 	}
 }
 
 func (s Snapshot) String() string {
-	return fmt.Sprintf("%25s: thread %6s in namespace %10s", s.Name, s.Thread, s.NS)
+	return fmt.Sprintf("%25s in namespace %10s", s.Name, s.NS)
 }
 
 type Snapshot struct {
-	Name   string
-	Thread string
-	NS     string
+	Name string
+	NS   string
 }
 
-func WhatNS() string {
-	inode, err := getInodeCurNetNS()
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%x", inode)
-}
-
-func WhatThread() string {
-	return fmt.Sprintf("%d", unix.Gettid())
-}
-
-func getInodeCurNetNS() (uint64, error) {
-	curNS, err := ns.GetCurrentNS()
-	if err != nil {
-		return 0, err
-	}
-	defer curNS.Close()
-	return getInodeNS(curNS)
-}
-
-func getInodeNS(netns ns.NetNS) (uint64, error) {
-	return getInodeFd(int(netns.Fd()))
+func getCurrentThreadNetNSPath() string {
+	// /proc/self/ns/net returns the namespace of the main thread, not
+	// of whatever thread this goroutine is running on.  Make sure we
+	// use the thread's net namespace since the thread is switching around
+	return fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid())
 }
 
 func getInode(path string) (uint64, error) {
