@@ -8,5 +8,8 @@ Vagrant.configure("2") do |config|
     apt-get install -y golang
     echo GOPATH="/go" >> /etc/environment
     echo PATH="$PATH:/go/bin" >> /etc/environment
+    source /etc/environment
+    export GOPATH
+    go install github.com/rosenhouse/ns-mess
   SHELL
 end
