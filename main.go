@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"golang.org/x/sys/unix"
@@ -13,24 +14,19 @@ func mainWithErr() error {
 	originalMain := Snap("main start")
 	log.Println(originalMain)
 
-	// create a new namespace
 	newNS, err := ns.NewNS()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if closeErr := newNS.Close(); closeErr != nil {
-			log.Fatalf("close ns error: %s", closeErr)
-			panic(closeErr)
-		}
-	}()
 
 	makeMeSomeGoRoutines := make(chan string)
 	stopTheGoRoutines := make(chan struct{})
+	wg := sync.WaitGroup{}
 
 	// in the background, we spin up some goroutines
 	go func() {
 		for name := range makeMeSomeGoRoutines {
+			wg.Add(1)
 			myName := name
 			go func() {
 				originalGoRoutine := Snap(myName)
@@ -39,6 +35,7 @@ func mainWithErr() error {
 				<-stopTheGoRoutines
 				finalGoRoutine := Snap(myName)
 				reportIfNamespaceSwitch(myName, "end", originalGoRoutine, finalGoRoutine)
+				wg.Done()
 			}()
 		}
 	}()
@@ -47,7 +44,7 @@ func mainWithErr() error {
 	err = newNS.Do(func(prevNS ns.NetNS) error {
 		originalNewNS := Snap("newns start")
 		log.Println(originalNewNS)
-		for i := 0; i < 25; i++ {
+		for i := 0; i < 50; i++ {
 			makeMeSomeGoRoutines <- fmt.Sprintf("goroutine %2d", i)
 		}
 		close(stopTheGoRoutines)
@@ -56,6 +53,8 @@ func mainWithErr() error {
 		return nil
 	})
 
+	log.Println(Snap("main waiting"))
+	wg.Wait()
 	log.Println(Snap("main stop "))
 	return err
 }
@@ -70,16 +69,12 @@ func Snap(name string) Snapshot {
 
 func reportIfNamespaceSwitch(name, state string, original, final Snapshot) {
 	if final.NS != original.NS {
-		log.Printf("%25s: %5s: expected to be in NS %s but am instead in NS %s", name, state, original.NS, final.NS)
+		log.Printf("MESSY %s: %5s: expected to be in NS %s but am instead in NS %s", name, state, original.NS, final.NS)
 	}
 }
 
 func (s Snapshot) String() string {
 	return fmt.Sprintf("%25s: thread %6s in namespace %10s", s.Name, s.Thread, s.NS)
-}
-
-func (s Snapshot) Numbers() string {
-	return fmt.Sprintf("thread %s in namespace %s", s.Thread, s.NS)
 }
 
 type Snapshot struct {
