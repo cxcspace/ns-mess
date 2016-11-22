@@ -22,23 +22,21 @@ root@ubuntu-xenial:/# ns-mess
 failure looks like
 ```
       main   start in namespace f0000075
-     newns   start in namespace f00010c5
-MESSY goroutine  7 start: expected f0000075, actual f00010c5
-MESSY goroutine 12 start: expected f0000075, actual f00010c5
-MESSY goroutine 33 start: expected f0000075, actual f00010c5
-MESSY goroutine 41 start: expected f0000075, actual f00010c5
-MESSY goroutine 40 start: expected f0000075, actual f00010c5
-MESSY goroutine 45 start: expected f0000075, actual f00010c5
-MESSY goroutine 49 start: expected f0000075, actual f00010c5
-MESSY goroutine 48 start: expected f0000075, actual f00010c5
-MESSY goroutine 44 start: expected f0000075, actual f00010c5
-     newns     end in namespace f00010c5
+     newns   start in namespace f000187d
+MESSY goroutine  1 start: expected f0000075, actual f000187d
+MESSY goroutine  9 start: expected f0000075, actual f000187d
+MESSY goroutine  8 start: expected f0000075, actual f000187d
+MESSY goroutine 11 start: expected f0000075, actual f000187d
+MESSY goroutine 10 start: expected f0000075, actual f000187d
+MESSY goroutine 12 start: expected f0000075, actual f000187d
+MESSY goroutine 15 start: expected f0000075, actual f000187d
+MESSY goroutine 14 start: expected f0000075, actual f000187d
+MESSY goroutine 17 start: expected f0000075, actual f000187d
+MESSY goroutine 19 start: expected f0000075, actual f000187d
+MESSY goroutine 18 start: expected f0000075, actual f000187d
+     newns     end in namespace f000187d
+MESSY goroutine 25   end: expected f0000075, actual f000187d
       main waiting in namespace f0000075
-MESSY goroutine  1   end: expected f0000075, actual f00010c5
-MESSY goroutine  7   end: expected f00010c5, actual f0000075
-MESSY goroutine 12   end: expected f00010c5, actual f0000075
-MESSY goroutine 33   end: expected f00010c5, actual f0000075
-MESSY goroutine 41   end: expected f00010c5, actual f0000075
-MESSY goroutine  0   end: expected f0000075, actual f00010c5
-      main     end in namespace f0000075
+      main     end in namespace f000187d
+error: at least one goroutine saw the wrong namespace
 ```

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"golang.org/x/sys/unix"
 )
+
+const nGoRoutines = 50
 
 // Snapshot is a string representation of the namespace inode
 type Snapshot string
@@ -43,10 +44,12 @@ func getInodeFd(fd int) (uint64, error) {
 	return stat.Ino, err
 }
 
-func reportIfUnexpectedNS(msg string, original, final Snapshot) {
+func checkUnexpectedNS(msg string, original, final Snapshot) bool {
 	if final != original {
 		log.Printf("MESSY %15s: expected %s, actual %s", msg, original, final)
+		return false
 	}
+	return true
 }
 
 func reportNamespace(routine, state string, snapshot Snapshot) {
@@ -59,7 +62,7 @@ func mainWithErr() error {
 
 	workQueue := make(chan string)
 	done := make(chan struct{})
-	wg := sync.WaitGroup{}
+	results := make(chan bool, 2*nGoRoutines)
 
 	// in the background, we will spin up go routines, on demand
 	// the call stack that spawned them never changed namespaces
@@ -67,16 +70,15 @@ func mainWithErr() error {
 	// would only ever run on the host namespace
 	go func() {
 		for item := range workQueue {
-			wg.Add(1)
 			myName := item
 			go func() {
 				originalNS := SnapshotNS()
-				reportIfUnexpectedNS(myName+" start", hostNS, originalNS)
+				results <- checkUnexpectedNS(myName+" start", hostNS, originalNS)
 
 				<-done
+
 				finalNS := SnapshotNS()
-				reportIfUnexpectedNS(myName+"   end", originalNS, finalNS)
-				wg.Done()
+				results <- checkUnexpectedNS(myName+"   end", originalNS, finalNS)
 			}()
 		}
 	}()
@@ -93,7 +95,7 @@ func mainWithErr() error {
 		reportNamespace("newns", "start", newNS)
 
 		// queue up some work
-		for i := 0; i < 50; i++ {
+		for i := 0; i < nGoRoutines; i++ {
 			workQueue <- fmt.Sprintf("goroutine %2d", i)
 		}
 		close(done)
@@ -101,11 +103,23 @@ func mainWithErr() error {
 		reportNamespace("newns", "end", SnapshotNS())
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	reportNamespace("main", "waiting", SnapshotNS())
-	wg.Wait()
+
+	allGood := true
+	for i := 0; i < nGoRoutines; i++ {
+		allGood = allGood && <-results
+	}
 	reportNamespace("main", "end", SnapshotNS())
-	return err
+
+	if allGood {
+		return nil
+	} else {
+		return fmt.Errorf("at least one goroutine saw the wrong namespace")
+	}
 }
 
 func main() {
