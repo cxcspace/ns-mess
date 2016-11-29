@@ -34,29 +34,28 @@ int printInterfaces()
 
 int main(int argc, char **argv)
 {
-  int n;
-  int fd;
-  for (n = 1; n < argc; n++) {
-     fd = open(argv[n], O_RDONLY);
-     if (fd == -1) {
-       fprintf(stderr, "error: open %s\n", argv[n]);
-       exit(1);
-     }
+  int fileDescriptor;
+  char *filePath;
+  for (int i = 1; i < argc; i++) {
+    filePath = argv[i];
+    fileDescriptor = open(filePath, O_RDONLY);
+    if (fileDescriptor == -1) {
+      fprintf(stderr, "error: open %s\n", filePath);
+      return 1;
+    }
 
-     fprintf(stderr, "switching to %s\n", argv[n]);
+    printf("switching to %s\n", filePath);
 
-     if (setns(fd, 0) == -1) {
-       fprintf(stderr, "error: setns\n");
-       exit(1);
-     }
+    if (setns(fileDescriptor, 0) == -1) {
+      fprintf(stderr, "error: setns\n");
+      return 1;
+    }
 
-     fprintf(stderr, "interfaces:\n");
+    if (printInterfaces() == -1) {
+      fprintf(stderr, "printInterfaces");
+      return 1;
+    }
 
-     if (printInterfaces() == -1) {
-       fprintf(stderr, "printInterfaces");
-       exit(1);
-     }
-
-     fprintf(stderr, "\n");
+    printf("\n");
   }
 }
