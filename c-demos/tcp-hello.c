@@ -96,10 +96,13 @@ int main(int argc, char **argv) {
   int numNamespaces = argc - 1;
   char** namespacePaths = &argv[1];
 
-  pthread_t* threads = (pthread_t*) malloc(numNamespaces * sizeof(pthread_t));
-  for (int i = 0; i < numNamespaces; i++)
-    pthread_create(&threads[i], NULL, (void *(*) (void *)) threadWorker, (void *) namespacePaths[i]);
+  for (int i = 0; i < numNamespaces; i++) {
+    pthread_t thread;
+    pthread_create(&thread, NULL,
+        (void *(*) (void *)) threadWorker,
+        (void *) namespacePaths[i]
+    );
+  }
 
-  for (int i = 1; i < numNamespaces; i++)
-    pthread_join(threads[i], NULL);
+  pause();
 }
