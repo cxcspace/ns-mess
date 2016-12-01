@@ -20,11 +20,14 @@
 
 const int listenPort = 5000;
 
-int listenAndServe(char* message) {
+// listenAndServe waits for connections in a loop
+// when a client connects, it sends the message and disconnects
+// listenAndServe returns only if there is an error
+void listenAndServe(char* message) {
   int listener = socket(AF_INET, SOCK_STREAM, 0);
   if (listener < 0) {
     perror("error: listenAndServe: opening socket");
-    return -1;
+    return;
   }
 
   int optval = 1; // allow port to be immediately re-used after process is killed
@@ -38,13 +41,13 @@ int listenAndServe(char* message) {
 
   if (bind(listener, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
     perror("error: listenAndServe: binding");
-    return -1;
+    return;
   }
 
   const int queueLength = 5;
   if (listen(listener, queueLength) < 0) {
     perror("error: listenAndServe: listen");
-    return -1;
+    return;
   }
 
   while (1) {
@@ -53,12 +56,12 @@ int listenAndServe(char* message) {
     int connection = accept(listener, (struct sockaddr *) &clientAddr, &clientlen);
     if (connection < 0) {
       perror("error: accept");
-      return -1;
+      return;
     }
 
     if (write(connection, message, strlen(message)) < 0) {
       perror("error: writing to socket");
-      return -1;
+      return;
     }
 
     close(connection);
@@ -85,11 +88,9 @@ void* threadWorker(char* namespacePath) {
 
   fprintf(stderr, "\nstarting a server in namespace %s\n", namespacePath);
   snprintf(message, BUFFER_SIZE, "hello from namespace %s\n", namespacePath);
-  if (listenAndServe(message) < 0) {
-    exit(1);
-  }
 
-  return NULL;
+  listenAndServe(message); // should block forever
+  exit(1); // if we get here, there's been an error
 }
 
 int main(int argc, char **argv) {
