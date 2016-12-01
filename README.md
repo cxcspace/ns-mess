@@ -1,5 +1,5 @@
 # ns-mess
-Investigations into Go programs that change their Linux namespace.
+Investigations into Go programs that switch their Linux [namespace](http://man7.org/linux/man-pages/man7/namespaces.7.html).
 
 ## A minimal reproduction
 ```bash
@@ -9,7 +9,7 @@ sudo su
 ns-mess
 ```
 
-Sometimes, it succeeds:
+Sometimes it succeeds:
 ```
 root@ubuntu-xenial:/# ns-mess
       main   start in namespace f0000075
@@ -19,7 +19,7 @@ root@ubuntu-xenial:/# ns-mess
       main     end in namespace f0000075
 ```
 
-But often, it fails:
+But often it fails:
 ```
 root@ubuntu-xenial:/# ns-mess
       main   start in namespace f0000075
