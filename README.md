@@ -1,5 +1,7 @@
 # ns-mess
+Investigations into Go programs that change their Linux namespace.
 
+## A minimal reproduction
 ```bash
 vagrant up
 vagrant ssh
@@ -7,8 +9,7 @@ sudo su
 ns-mess
 ```
 
-
-success looks like
+Sometimes, it succeeds:
 ```
 root@ubuntu-xenial:/# ns-mess
       main   start in namespace f0000075
@@ -18,8 +19,7 @@ root@ubuntu-xenial:/# ns-mess
       main     end in namespace f0000075
 ```
 
-
-failure looks like
+But often, it fails:
 ```
 root@ubuntu-xenial:/# ns-mess
       main   start in namespace f0000075
@@ -41,3 +41,10 @@ MESSY goroutine 25   end: expected f0000075, actual f000187d
       main     end in namespace f000187d
 error: at least one goroutine saw the wrong namespace
 ```
+
+## Further reading
+- https://github.com/containernetworking/cni/issues/262
+- https://github.com/vishvananda/netns/issues/17
+- https://github.com/docker/libnetwork/issues/1113
+- https://github.com/weaveworks/weave/issues/2388#issuecomment-228365069
+- https://gist.github.com/sykesm/020a27341cca5169250990d250b25db4
