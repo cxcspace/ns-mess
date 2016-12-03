@@ -5,6 +5,5 @@ set -o pipefail
 
 cd "$(dirname $0)"
 mkdir -p bin
-gcc list-interfaces.c -o bin/list-interfaces
 gcc netns-exec.c -o bin/netns-exec
 gcc tcp-hello.c -pthread -o bin/tcp-hello
