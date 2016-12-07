@@ -1,8 +1,7 @@
 /*
-   inherit /path/to/namespace1 /path/to/namespace2
+   inherit.c
 
-   Will switch to the first namespace, then spawn a thread which will switch
-   to the second namespace.
+   Will switch to the namespace provided as an arg, and will then spawn a thread.
 */
 
 #define _GNU_SOURCE
@@ -15,15 +14,26 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 
+void switchToNamespace(char* namespacePath) {
+  int namespaceFd = open(namespacePath, O_RDONLY);
+  if (namespaceFd < 0) {
+    perror("error: open namespace");
+    exit(1);
+  }
+
+  if (setns(namespaceFd, 0) < 0) {
+    perror("error: setns");
+    exit(1);
+  }
+}
 
 int getThreadID() {
   return syscall(SYS_gettid);
 }
 
 long int getInodeOfCurrentNetNS() {
-  int threadID = getThreadID();
   char myNSPath[100];
-  sprintf(myNSPath, "/proc/self/task/%d/ns/net", threadID);
+  sprintf(myNSPath, "/proc/self/task/%d/ns/net", getThreadID());
 
   int currentNS = open(myNSPath, O_RDONLY);
   if (currentNS < 0) {
@@ -36,45 +46,29 @@ long int getInodeOfCurrentNetNS() {
       perror("error: stat namespace");
       exit(1);
   }
-
   close(currentNS);
 
   return nsStat.st_ino;
 }
 
-void switchToNamespace(char* namespacePath) {
-  int namespaceFd = open(namespacePath, O_RDONLY);
-  if (namespaceFd < 0) {
-    perror("error: open namespace");
-    exit(1);
-  }
-
-  if (setns(namespaceFd, 0) < 0) {
-    perror("error: setns");
-    exit(1);
-  }
-  printf("\tswitched to %s\n", namespacePath);
-}
-
 void report(char* msg) {
-  fprintf(stdout, "%30s: on thread %d in netns %lx\n", msg, getThreadID(), getInodeOfCurrentNetNS());
+  fprintf(stdout, "%20s: on thread %d in netns %ld\n", msg, getThreadID(), getInodeOfCurrentNetNS());
 }
 
-void* threadWorker(char* namespacePath) {
-  report("started thread");
-  switchToNamespace(namespacePath);
-  report("thread switched");
+void* threadWorker(void* _) {
+  report("in new thread");
   return NULL;
 }
 
-void launchThreadAndWait(char* threadWorkerArg) {
+void launchThreadAndWait() {
   pthread_t thread;
   pthread_create(&thread, NULL,
         (void *(*) (void *)) threadWorker,
-        (void *) threadWorkerArg
+        (void *) NULL
     );
 
   void* res;
+  // wait for the thread to complete
   if (pthread_join(thread, &res) != 0) {
     perror("error: join");
     exit(1);
@@ -83,17 +77,17 @@ void launchThreadAndWait(char* threadWorkerArg) {
 
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    fprintf(stderr, "usage: %s nspath1 nspath2\n", argv[0]);
+  if (argc != 2) {
+    fprintf(stderr, "usage: %s nspath1\n", argv[0]);
     exit(1);
   }
 
   report("main started");
-  switchToNamespace(argv[1]);
-  report("main, after first switch");
-  printf("\tcreating new thread...\n");
-  launchThreadAndWait(argv[2]);
-  report("returned to main");
 
-  return 0;
+  switchToNamespace(argv[1]);
+  printf("switched to %s\n", argv[1]);
+  report("main, after switch");
+
+  printf("creating new thread...\n");
+  launchThreadAndWait();
 }
