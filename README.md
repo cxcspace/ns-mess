@@ -1,3 +1,13 @@
+# FIXED in Go 1.10
+
+Go 1.10 runtime now does the right thing with Goroutines and Threads,
+[see here](https://golang.org/doc/go1.10#runtime).
+
+I'm keeping this repo around as an artifact.
+
+You can play with different Go
+versions by adjusting the environment variable in the [`Vagrantfile`](Vagrantfile).
+
 # ns-mess
 Investigations into Go programs that switch their Linux [namespace](http://man7.org/linux/man-pages/man7/namespaces.7.html).
 
